@@ -34,7 +34,7 @@ typedef struct
 endat_interface_t endat_interface[] =
 {
   { "read_register"       , read_register        },
-  { "write_register"      , write_register       },
+  { "write_command"       , write_command        },
   { "open_endat_driver"   , open_endat_driver    },
   { "close_endat_driver"  , close_endat_driver   },
   { "makeCrcNorm"         , make_crc_norm        },

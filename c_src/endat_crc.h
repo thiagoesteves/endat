@@ -61,4 +61,12 @@ uint32_t MakeCrcPos(uint32_t clocks, uint32_t endat,   uint32_t error1,
 uint32_t LookupTableMakeCrcPos(uint32_t clocks, uint32_t endat,   uint32_t error1,
                                uint32_t error2, uint32_t highpos, uint32_t lowpos);
 
+/** @brief Reverse 32-bits
+ *
+ *  @param n word to be reversed
+ *
+ * @return uint32_t reversed word
+ */
+uint32_t reverse32Bits(uint32_t n);
+
 #endif /* ENDAT_C_SRC_ENDAT_CRC_H */

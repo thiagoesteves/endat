@@ -107,3 +107,22 @@ int send_answer_string_ulong(const char *string, const uint32_t value)
   ei_x_free(&result);
   return retval;
 }
+
+int send_answer_string_binary(const char *string, const uint8_t *array, 
+                              const uint32_t size)
+{
+  int retval = 0;
+  ei_x_buff result;
+
+  /* Output buffer that will hold {ok, Result} */
+  if (ei_x_new_with_version(&result)                       ||
+      ei_x_encode_tuple_header(&result, TUPLE_HEADER_SIZE) ||
+      ei_x_encode_atom(&result, string)                    ||
+      ei_x_encode_binary(&result, (void *)array, size)     ||
+      (write_cmd(&result) == 0))
+  {
+    retval = -1;
+  }
+  ei_x_free(&result);
+  return retval;
+}

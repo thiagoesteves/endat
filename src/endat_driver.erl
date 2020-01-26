@@ -24,7 +24,7 @@
 
 %% ENDAT Driver API
 -export([read_register/2,
-         write_register/3]).
+         write_command/3]).
 
 
 %% ENDAT TEST API, these functions won't be used by the Endat gen_server
@@ -131,8 +131,8 @@ talk_to_port(Port,Msg) ->
 read_register(Instance, Register) ->
   gen_server:call(?MODULE, {read_register, Instance, Register}).
 
-write_register(Instance, Register, Value) ->
-  gen_server:call(?MODULE, {write_register, Instance, Register, Value}).
+write_command(Instance, Command, Timeout) ->
+  gen_server:call(?MODULE, {write_command, Instance, Command, Timeout}).
 
 %%%===================================================================
 %%% Public TEST API

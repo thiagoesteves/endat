@@ -47,13 +47,13 @@ int read_register(char *buf, int *index);
 /** @brief Write at ENDAT register, this function expects 3 arguments from ENDAT 
  *         driver in Erlang:
  *         @param Instance ENDAT instance
- *         @param Register Register to write
- *         @param Value Value to write
+ *         @param command Completed command to write
+ *         @param timeout Maximum timeout fro the encoder answer
  *
  * @return  < 0 on error
  *         == 0 on success
  */
-int write_register(char *buf, int *index);
+int write_command(char *buf, int *index);
 
 /** @brief Calculate the Norm CRC using Heidenhain algorithm.
  *.        this function expects 3 arguments from Endat gen_server

@@ -30,10 +30,12 @@
 
 %% Public API export where the Instance is required
 -export([get_state/1,
+         get_clocks/1,
          set_reset/1]).
 
 %% Public API export where the Instance is the default defined value
 -export([get_state/0,
+         get_clocks/0,
          set_reset/0]).
 
 -compile([export_all]).
@@ -43,6 +45,44 @@
 %%%===================================================================
 
 -define(DEFAULT_INSTANCE, 0).
+
+%%%===================================================================
+%%% Mode Defines (6-bits)
+%%%===================================================================
+
+-define(MODE_ENCODER_SEND_POS,   2#000111).
+-define(MODE_SELECT_MEMORY,      2#001110).
+-define(MODE_ENCODER_RCV_PARAM,  2#011100).
+-define(MODE_ENCODER_SEND_PARAM, 2#100011).
+-define(MODE_ENCODER_RCV_RESET,  2#101010).
+
+%%%===================================================================
+%%% MRS Defines (8-bits)
+%%%===================================================================
+
+-define(MRS_OPERATION,       2#10111001).
+-define(MRS_PARAM_MANUF_1,   2#10100001).
+-define(MRS_PARAM_MANUF_2,   2#10100011).
+-define(MRS_PARAM_MANUF_3,   2#10100101).
+-define(MRS_OPERATING_PARAM, 2#10100111).
+-define(MRS_OEM_PARAM_1,     2#10101001).
+-define(MRS_OEM_PARAM_2,     2#10101011).
+-define(MRS_OEM_PARAM_3,     2#10101101).
+-define(MRS_OEM_PARAM_4,     2#10101111).
+
+%%%===================================================================
+%%% MEMORY DEFINES
+%%%===================================================================
+
+-define(ADDRESS_ENDAT_INTERFACE,    16#8).
+-define(ADDRESS_NUMBER_OF_CLOCKS,   16#D).
+
+%%%===================================================================
+%%% Timeout defines in ms
+%%%===================================================================
+
+-define(RESET_TIMEOUT,       16).
+-define(CMD_TIMEOUT,         5).
 
 %%%===================================================================
 %%% Register Defines
@@ -103,9 +143,13 @@ handle_cast(_Msg, State) ->
 handle_call({get, state}, _From, State) ->
   {reply, State, State};
 
+handle_call({get, Operation}, _From, State) ->
+  Res = send_endat(Operation, State#endat_info.instance),
+  {reply, Res, State};
+
 %% Set operations with no arguments
 handle_call({set, Operation}, _From, State) ->
-  Res = write_priv(Operation, State#endat_info.instance),
+  Res = send_endat(Operation, State#endat_info.instance),
   {reply, Res, State};
 
 %% Get operations with arguments
@@ -140,6 +184,15 @@ set_reset() ->
 set_reset(Instance) ->
   gproc_call(Instance, {set, reset}).
 
+
+-spec get_clocks() -> { ok | error , integer() }.
+get_clocks() ->
+  get_clocks(?DEFAULT_INSTANCE).
+
+-spec get_clocks(endatInstance()) -> { ok | error , integer() }.
+get_clocks(Instance) ->
+  gproc_call(Instance, {get, get_clocks}).
+
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
@@ -148,17 +201,29 @@ set_reset(Instance) ->
 %% @private Update endat static data
 %%--------------------------------------------------------------------
 update_endat_state(S) ->
-  %% 1 byte information data
-  {ok, ChipId0} = endat_driver:read_register(S#endat_info.instance, 0),
-  {ok, ChipId1} = endat_driver:read_register(S#endat_info.instance, 1),
   %% Update all information but instance
   S.
 
 %%--------------------------------------------------------------------
 %% @private Write endat information
 %%--------------------------------------------------------------------
-write_priv(reset, Instance) ->
-  endat_driver:write_register(Instance, 0, 1).
+send_endat(reset, Instance) ->
+  %% Send command and analyse the encoder response
+  {ok, <<0:34, 1:1, Param8:8, Param16:16, Crc:5>>} = 
+      endat_driver:write_command(Instance, 
+                                 compose_send_cmd(?MODE_ENCODER_RCV_RESET, 0, 0), 
+                                 ?RESET_TIMEOUT),
+  {ok, Crc} = endat_crc:makeCrcNormLt(Param8,Param16),
+  {ok, 0};
+
+send_endat(get_clocks, Instance) ->
+  %% Send command and analyse the encoder response
+  {ok, <<0:34, 1:1, Param8:8, Param16:16, Crc:5>>} = 
+      endat_driver:write_command(Instance, 
+                                 compose_send_cmd(?MODE_ENCODER_SEND_PARAM, ?ADDRESS_NUMBER_OF_CLOCKS, 0), 
+                                 ?RESET_TIMEOUT),
+  {ok, Crc} = endat_crc:makeCrcNormLt(Param8,Param16),
+  {ok, Param16}.
 
 %%--------------------------------------------------------------------
 %% @private Send a gen_server:call message if the PID is found
@@ -169,6 +234,13 @@ gproc_call(Instance, Msg) ->
     [Pid] -> gen_server:call(Pid, Msg);
     _ -> {error, invalid_endat}
   end.
+
+compose_send_cmd(Mode, Address, Data) ->
+  b2u32(<<0:1,Mode:6, 0:1, Address:8, Data:16>>).
+
+b2u32(Bin) ->
+  binary:decode_unsigned(Bin).
+
 
 
 

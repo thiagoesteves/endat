@@ -42,4 +42,10 @@ int read_cmd(char **pbuf, int *size, int *curpos);
  */
 int send_answer_string_ulong(const char *string, const uint32_t value);
 
+int send_answer_string_list_ulong(const char *string, const uint32_t *array, 
+                                  const uint32_t size);
+
+int send_answer_string_binary(const char *string, const uint8_t *array, 
+                              const uint32_t size);
+
 #endif /* ENDAT_C_SRC_ERL_COMM_H */

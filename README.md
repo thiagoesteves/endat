@@ -59,8 +59,9 @@ http://erlang.org/doc/tutorial/c_port.html
 
 http://erlang.org/doc/reference_manual/ports.html
 
-### Endat References ###
+https://erlang.org/doc/man/erl_nif.html#enif_make_uint
 
+### Endat References ###
 https://www.heidenhain.de/fileadmin/pdb/media/img/383942-28_EnDat_2-2_en.pdf
 
 https://www.endat.de/de_EN/endat2/

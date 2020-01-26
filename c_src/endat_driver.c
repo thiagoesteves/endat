@@ -24,6 +24,7 @@
  */
 #define ENDAT_MAX_INSTANCES (20)
 #define ENDAT_MAX_REGISTERS (256)
+#define ENDAT_MODE_MASK     (0xFF)
 
 typedef enum
 {
@@ -103,23 +104,56 @@ int read_register(char *buf, int *index)
   return send_answer_string_ulong("ok", (uint32_t)read_value);
 }
 
-int write_register(char *buf, int *index)
+int write_command(char *buf, int *index)
 {
-  unsigned long instance, reg, value;
+  unsigned long instance, command, timeout, send_endat_cmd;
+  uint8_t answer[8] = {0};
   
   if (ei_decode_ulong(buf, index, &instance) ||
-      ei_decode_ulong(buf, index, &reg)      ||
-      ei_decode_ulong(buf, index, &value))
+      ei_decode_ulong(buf, index, &command)  ||
+      ei_decode_ulong(buf, index, &timeout))
   {
       return ENDAT_ERROR;
   }
 
-  /*TODO: Insert the reading of the endat pin here */
+  /* STUB CODE: Emulate ENDAT's command                                       */
+  /* The suggestion is to send the 32 bits from LSB first which means we have */
+  /* to reverse the received command                                          */
+  send_endat_cmd = reverse32Bits(command);
 
-  /* STUB CODE: Initilise Emulator data for all ENDAT's */
-  stub_endat_info[instance].data[reg] = (uint8_t)value;
+  /*TODO: Insert the sending of the command to the endat encoder here and use
+          the timeout as the maximum time to wait for the start bit in the
+          answer.
+  */
 
-  return send_answer_string_ulong("ok", ENDAT_OK);
+  /* Analyse command to emulate the correct answer                            */
+  if ((send_endat_cmd & ENDAT_MODE_MASK) == 0x2A)        /* reset command */
+  { /* Start bit + 24 bits + CRC */
+    answer[7] = 0x18;
+    answer[6] = 0x00;
+    answer[5] = 0x00;
+    answer[4] = 0x20;
+  }
+  else if ((send_endat_cmd & ENDAT_MODE_MASK) ==  0x62)  /* reading command */
+  {
+    /* Extract information from command */
+    uint8_t Address = (command & 0xFF0000) >> 16;
+    uint16_t Param16 = 0;
+    
+    if (Address == 0x08) {
+      Param16 = 0;  /* Version of Endat */
+    } else if (Address == 0x0D) {
+      Param16 = 25; /* Number of clocks */
+    }
+
+    answer[7] = (uint8_t)((Param16 & 0x7) << 5 ) | 
+                 (uint8_t)(LookupTableMakeCrcNorm(Address, Param16));
+    answer[6] = (uint8_t)((Param16 & 0x7FF) >> 3);
+    answer[5] = (Address << 5) | (uint8_t)(Param16 >> 11);
+    answer[4] = 0x20 | (Address >> 3);
+  }
+
+  return send_answer_string_binary("ok", answer, sizeof(answer));
 }
 
 int make_crc_norm(char *buf, int *index)
