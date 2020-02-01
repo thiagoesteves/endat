@@ -34,16 +34,6 @@ int open_endat_driver(char *buf, int *index);
  */
 int close_endat_driver(char *buf, int *index);
 
-/** @brief Read ENDAT register, this function expects 2 arguments from ENDAT 
- *         driver in Erlang:
- *         @param Instance ENDAT instance
- *         @param Register Register to read
- *
- * @return  < 0 on error
- *         == 0 on success
- */
-int read_register(char *buf, int *index);
-
 /** @brief Write at ENDAT register, this function expects 3 arguments from ENDAT 
  *         driver in Erlang:
  *         @param Instance ENDAT instance

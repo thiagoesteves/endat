@@ -11,9 +11,10 @@
 %% static information records
 -record(endat_info, {
   instance,
+  endat_version, % 0 for Endat 2.1 and 1 for Endat 2.2
+  id,
   serial,
-  bits_pos1,
-  revision_id
+  bits_pos1
 }).
 
 -endif. %% endat
