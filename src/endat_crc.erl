@@ -20,6 +20,9 @@
 %% ENDAT CRC API (using heidenhain functions)
 -export([makeCrcNorm/2, makeCrcPos/6]).
 
+%% Auxiliar functions
+-export([reverse32Bits/1, reverse64Bits/1]).
+
 %%--------------------------------------------------------------------
 %% DEFINITIONS
 %%--------------------------------------------------------------------
@@ -42,6 +45,12 @@ makeCrcNorm(_, _) ->
   not_loaded(?LINE).
 
 makeCrcPos(_, _, _, _, _, _) ->
+  not_loaded(?LINE).
+
+reverse32Bits(_) ->
+  not_loaded(?LINE).
+
+reverse64Bits(_) ->
   not_loaded(?LINE).
 
 %%%===================================================================

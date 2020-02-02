@@ -23,6 +23,8 @@
 #define ENDAT_MAX_INSTANCES (20)
 #define ENDAT_MAX_REGISTERS (256)
 #define ENDAT_MODE_MASK     (0xFF)
+#define ENDAT_CRC_MASK      (0x1F)
+#define ENDAT_CRC_BITS      (0x05)
 
 /****************************************************************************
  *              functions called by Erlang Gen Server                       *
@@ -40,6 +42,63 @@ int close_endat_driver(char *buf, int *index)
   /*TODO: Insert the closing of the driver here */
   
   return send_answer_string_ulong("ok", ENDAT_OK);
+}
+
+int read_position(char *buf, int *index)
+{
+  unsigned long instance, command, endat_ver, position_bits;
+  uint8_t answer[8] = {0};
+  int8_t buff_index;
+  
+  if (ei_decode_ulong(buf, index, &instance)   ||
+      ei_decode_ulong(buf, index, &endat_ver)  ||
+      ei_decode_ulong(buf, index, &command)    ||
+      ei_decode_ulong(buf, index, &position_bits))
+  {
+      return ENDAT_ERROR;
+  }
+
+  /*TODO: Insert the sending of reading position command here */
+
+  /* STUB CODE: Emulate ENDAT's command                                       */
+  /* The suggestion is to send the 8 bits command from LSB which means we     */
+  /* have to reverse the received command                                     */
+  /* Once we have the answer, store LSB bits from byte 7 to byte 0            */
+  /*
+   ____________________________________
+  |  0000 Start + Err + position + CRC |
+  |byte 0 | ...................| byte 7|
+  */
+  static uint64_t fake_position = 0x1ADEADBEEF;
+  /*Composed Inverted Position Bits */
+  uint64_t inverted_pos = reverse64Bits(fake_position);
+  inverted_pos = (uint64_t)(inverted_pos >> (64 - position_bits));
+  /*Calculate CRC */
+  uint8_t crc = (uint8_t)(LookupTableMakeCrcPos(position_bits, endat_ver, 0, 1, 
+                 (uint32_t)(fake_position >> 32), (uint32_t)(fake_position)) );
+  /* Insert CRC */
+  inverted_pos = (uint64_t)(inverted_pos << ENDAT_CRC_BITS) | 
+                           (uint64_t)(crc & ENDAT_CRC_MASK);
+  /* Insert Start bit = 1 + Error = 0*/
+  if (endat_ver == 0)
+  { /* Endat 2.1 */
+    inverted_pos |= (uint64_t)((0x1ULL) << (position_bits+ENDAT_CRC_BITS+1));
+  }
+  else
+  { /* Endat 2.2  Start=1 , Err1 = 0, Err2 = 1 */
+    inverted_pos |= (uint64_t)((0x1ULL) << (position_bits+ENDAT_CRC_BITS));
+    inverted_pos |= (uint64_t)((0x1ULL) << (position_bits+ENDAT_CRC_BITS+2));
+  }
+
+  /* Compose answer */
+  buff_index = 7;
+  while (buff_index >= 0)
+  {
+    answer[buff_index--] = (uint8_t)(inverted_pos & 0xFF);
+    inverted_pos >>= 8;
+  }
+
+  return send_answer_string_binary("ok", answer, sizeof(answer));
 }
 
 int write_command(char *buf, int *index)
@@ -62,6 +121,13 @@ int write_command(char *buf, int *index)
   /*TODO: Insert the sending of the command to the endat encoder here and use
           the timeout as the maximum time to wait for the start bit in the
           answer.
+  */
+
+  /* Once we have the answer, store LSB bits from byte 7 to byte 0            */
+  /*
+   ______________________________________
+  |  0000 Start + Param8 + Param16 + CRC |
+  |byte 0 | .....................| byte 7|
   */
 
   /* Analyse command to emulate the correct answer                            */

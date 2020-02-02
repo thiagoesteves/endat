@@ -33,6 +33,7 @@ typedef struct
 
 endat_interface_t endat_interface[] =
 {
+  { "read_position"       , read_position        },
   { "write_command"       , write_command        },
   { "open_endat_driver"   , open_endat_driver    },
   { "close_endat_driver"  , close_endat_driver   },

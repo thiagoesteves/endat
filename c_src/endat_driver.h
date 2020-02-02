@@ -34,6 +34,17 @@ int open_endat_driver(char *buf, int *index);
  */
 int close_endat_driver(char *buf, int *index);
 
+/** @brief Read position from Encoder, this function expects 3 arguments from ENDAT 
+ *         driver in Erlang:
+ *         @param Instance ENDAT instance
+ *         @param EndatVersion Endat version 2.1 or 2.2
+ *         @param PositionBits Number of bits to read the position
+ *
+ * @return  < 0 on error
+ *         == 0 on success
+ */
+int read_position(char *buf, int *index);
+
 /** @brief Write at ENDAT register, this function expects 3 arguments from ENDAT 
  *         driver in Erlang:
  *         @param Instance ENDAT instance

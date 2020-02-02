@@ -38,8 +38,6 @@
          get_position/0,
          set_reset/0]).
 
--compile([export_all]).
-
 %%%===================================================================
 %%% Global Defines
 %%%===================================================================
@@ -92,6 +90,11 @@
 
 -define(ENDAT_2_1,           0).
 -define(ENDAT_2_2,           1).
+
+%% 64bits (answer sizeof) - (Start + Error1 + X + Crc)
+-define(ENDAT_2_1_POSITION_HEADER, (64 - 7)).
+%% 64bits (answer sizeof) - (Start + Error1 + Error2 + X + Crc)
+-define(ENDAT_2_2_POSITION_HEADER, (64 - 8)).
 
 %%%===================================================================
 %%% API
@@ -288,15 +291,41 @@ send_cmd_and_check_crc(Instance, MODE, MRS, DATA, Timeout)->
   {ok, Crc} = endat_crc:makeCrcNormLt(Param8,Param16),
   {ok, Param16}.
 
-%% Read position for Endat 2.1
-read_position(_Instance, ?ENDAT_2_1, _PositionBits) ->
-  %% TODO Read position
-  {ok, 0};
+%% Read position for Endat 2.1 and Endat 2.2
+read_position(Instance, Endat, PositionBits) ->
+  {ok, <<Answer:64>>} = endat_driver:read_position(Instance,
+                                 Endat,
+                                 compose_read_cmd(), 
+                                 PositionBits),
+  analyse_received_position(Endat, Answer, PositionBits).
 
-%% Read position for Endat 2.1
-read_position(_Instance, ?ENDAT_2_2, _PositionBits) ->
-  %% TODO: Read position
-  {ok, 1}.
+analyse_received_position(Endat, Bin, PositionBits) ->
+  %% Check type of Endat
+  case Endat of
+    ?ENDAT_2_2 ->
+      Rest = ?ENDAT_2_2_POSITION_HEADER-PositionBits,
+      <<0:Rest, S:1, Err1:1, Err2:1, InvPos:PositionBits, Crc:5>> = <<Bin:64>>;
+    ?ENDAT_2_1 ->
+      Rest = ?ENDAT_2_1_POSITION_HEADER-PositionBits,
+      <<0:Rest, S:1, Err1:1, InvPos:PositionBits, Crc:5>> = <<Bin:64>>,
+      Err2=1
+  end,
+  %% Revert Position
+  {ok, P} = endat_crc:reverse64Bits(InvPos),
+  Rest2 = 64 - PositionBits,
+  %% Extract position
+  << Pos:PositionBits, _:Rest2 >> = padTo64(binary:encode_unsigned(P)),
+  %% Extract MSB and LSB position
+  <<High:32, Low:32>> = padTo64(binary:encode_unsigned(Pos)),
+  %% Check CRC
+  {ok, CalculatedCrc} = 
+    endat_crc:makeCrcPosLt(PositionBits,Endat,Err1,Err2,High,Low),
+  %% Check Answers
+  case {Crc, S, Err1, Err2} of
+    {CalculatedCrc, 1, 0, 1} -> {ok, Pos};
+    {CalculatedCrc, _, _, _} -> {error, encoder_error};
+    {_,_,_,_}                -> {error, invalid_crc}
+  end.
 
 %%--------------------------------------------------------------------
 %% @private Send a gen_server:call message if the PID is found
@@ -311,8 +340,17 @@ gproc_call(Instance, Msg) ->
 compose_send_cmd(Mode, Address, Data) ->
   b2u32(<<0:1,Mode:6, 0:1, Address:8, Data:16>>).
 
+compose_read_cmd() ->
+  b2u32(<<0:1,?MODE_ENCODER_SEND_POS:6, 0:1>>).
+
 b2u32(Bin) ->
   binary:decode_unsigned(Bin).
+
+padTo64(Bin) ->
+  case (8 - size(Bin)) of
+    0 -> Bin;
+    N -> <<0:(N*8), Bin/binary>>
+  end.
 
 
 

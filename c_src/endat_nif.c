@@ -35,9 +35,45 @@ mk_error(ErlNifEnv* env, const char* mesg)
 }
 
 ERL_NIF_TERM
-answer_ok_crc(ErlNifEnv* env, uint32_t crc)
+answer_ok_uint32(ErlNifEnv* env, uint32_t value)
 {
-    return enif_make_tuple2(env, make_atom(env, "ok"), enif_make_uint(env, crc));
+    return enif_make_tuple2(env, make_atom(env, "ok"), enif_make_uint(env, value));
+}
+
+ERL_NIF_TERM
+answer_ok_uint64(ErlNifEnv* env, uint64_t value)
+{
+    return enif_make_tuple2(env, make_atom(env, "ok"), enif_make_uint64(env, value));
+}
+
+static ERL_NIF_TERM
+reverse32Bits_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  uint32_t value;
+
+  if (!enif_get_uint(env, argv[0], &value))
+  {
+    return mk_error(env, "invalid_parameter");
+  }
+
+  value = reverse32Bits(value);
+
+  return answer_ok_uint32(env, value);
+}
+
+static ERL_NIF_TERM
+reverse64Bits_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  uint64_t value;
+
+  if (!enif_get_uint64(env, argv[0], (unsigned long *)&value))
+  {
+    return mk_error(env, "invalid_parameter");
+  }
+
+  value = reverse64Bits(value);
+
+  return answer_ok_uint64(env, value);
 }
 
 static ERL_NIF_TERM
@@ -53,7 +89,7 @@ MakeCrcNorm_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
   crc = MakeCrcNorm(param8, param16);
 
-  return answer_ok_crc(env, crc);
+  return answer_ok_uint32(env, crc);
 }
 
 static ERL_NIF_TERM
@@ -69,7 +105,7 @@ MakeCrcNormLt_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
   crc = LookupTableMakeCrcNorm(param8, param16);
 
-  return answer_ok_crc(env, crc);
+  return answer_ok_uint32(env, crc);
 }
 
 static ERL_NIF_TERM
@@ -89,7 +125,7 @@ MakeCrcPos_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
   crc = MakeCrcPos(clocks, endat, error1, error2, highpos, lowpos);
 
-  return answer_ok_crc(env, crc);
+  return answer_ok_uint32(env, crc);
 }
 
 static ERL_NIF_TERM
@@ -109,11 +145,13 @@ MakeCrcPosLt_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
   crc = LookupTableMakeCrcPos(clocks, endat, error1, error2, highpos, lowpos);
 
-  return answer_ok_crc(env, crc);
+  return answer_ok_uint32(env, crc);
 }
 
 static ErlNifFunc nif_funcs[] = 
 {
+  {"reverse32Bits" , 1, reverse32Bits_nif},
+  {"reverse64Bits" , 1, reverse64Bits_nif},
   {"makeCrcNormLt" , 2, MakeCrcNormLt_nif},
   {"makeCrcPosLt"  , 6, MakeCrcPosLt_nif},
   {"makeCrcNorm"   , 2, MakeCrcNorm_nif},

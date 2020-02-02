@@ -106,6 +106,12 @@ uint32_t reverse32Bits(uint32_t n)
   return n;
 }
 
+uint64_t reverse64Bits(uint64_t n)
+{
+  return ( ((uint64_t)reverse32Bits((uint32_t)(n)) << 32) | 
+            (uint64_t)reverse32Bits((uint32_t)(n >> 32)) );
+}
+
 uint32_t MakeCrcNorm(uint32_t param8, uint32_t param16)
 {
   uint32_t ff[5];
