@@ -31,12 +31,16 @@
 %% Public API export where the Instance is required
 -export([get_state/1,
          get_position/1,
-         set_reset/1]).
+         set_reset/1,
+         start_read_position/1,
+         stop_read_position/1]).
 
 %% Public API export where the Instance is the default defined value
 -export([get_state/0,
          get_position/0,
-         set_reset/0]).
+         set_reset/0,
+         start_read_position/0,
+         stop_read_position/0]).
 
 %%%===================================================================
 %%% Global Defines
@@ -154,6 +158,16 @@ handle_call(get_position, _From, State) ->
                       State#endat_info.bits_pos1),
   {reply, Res, State};
 
+handle_call(start_read_position, _From, State) ->
+  Res = endat_driver:start_read_position(State#endat_info.instance,
+                                         State#endat_info.endat_version,
+                                         State#endat_info.bits_pos1),
+  {reply, Res, State};
+
+handle_call(stop_read_position, _From, State) ->
+  Res = endat_driver:stop_read_position(State#endat_info.instance),
+  {reply, Res, State};
+
 handle_call(Operation, _From, State) ->
   Res = send_endat(Operation, State#endat_info.instance),
   {reply, Res, State}.
@@ -190,6 +204,22 @@ get_position() ->
 -spec get_position(endatInstance()) -> { ok | error , integer() }.
 get_position(Instance) ->
   gproc_call(Instance, get_position).
+
+-spec start_read_position() -> { ok | error , integer() }.
+start_read_position() ->
+  start_read_position(?DEFAULT_INSTANCE).
+
+-spec start_read_position(endatInstance()) -> { ok | error , integer() }.
+start_read_position(Instance) ->
+  gproc_call(Instance, start_read_position).
+
+-spec stop_read_position() -> { ok | error , integer() }.
+stop_read_position() ->
+  stop_read_position(?DEFAULT_INSTANCE).
+
+-spec stop_read_position(endatInstance()) -> { ok | error , integer() }.
+stop_read_position(Instance) ->
+  gproc_call(Instance, stop_read_position).
 
 %%%===================================================================
 %%% Internal functions

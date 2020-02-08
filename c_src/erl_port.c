@@ -37,6 +37,8 @@ endat_interface_t endat_interface[] =
   { "write_command"       , write_command        },
   { "open_endat_driver"   , open_endat_driver    },
   { "close_endat_driver"  , close_endat_driver   },
+  { "start_read_position" , start_read_position  },
+  { "stop_read_position"  , stop_read_position   },
   { "makeCrcNorm"         , make_crc_norm        },
   { "makeCrcNormLt"       , make_crc_norm_lt     },
   { "makeCrcPos"          , make_crc_pos         },

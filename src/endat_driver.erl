@@ -26,6 +26,9 @@
 -export([write_command/3,
          read_position/4]).
 
+%% Endat Start/Stop to read position continuously
+-export([start_read_position/3,
+         stop_read_position/1]).
 
 %% ENDAT TEST API, these functions won't be used by the Endat gen_server
 %% but can be used to test and compare the calculation when using
@@ -40,7 +43,7 @@
 %%%===================================================================
 
 -define(SERVER,  ?MODULE).
--define(TIMEOUT, 1000). % in milliseconds
+-define(TIMEOUT, 5000). % in milliseconds
 
 %%%===================================================================
 %%% API
@@ -74,6 +77,10 @@ terminate(_, Port) ->
 %%--------------------------------------------------------------------
 %% @private
 %%--------------------------------------------------------------------
+handle_info({Port, {data,Msg}}, Port) ->
+  io:format("\n\r ~p", [binary_to_term(Msg)]),
+  {noreply, Port};
+
 handle_info(_Info, State) ->
   {noreply, State}.
 
@@ -133,6 +140,12 @@ read_position(Instance, EndatVersion, Command, PositionBits) ->
 
 write_command(Instance, Command, Timeout) ->
   gen_server:call(?MODULE, {write_command, Instance, Command, Timeout}).
+
+start_read_position(Instance, EndatVersion, PositionBits) ->
+  gen_server:call(?MODULE, {start_read_position, Instance, EndatVersion, PositionBits}).
+
+stop_read_position(Instance) ->
+  gen_server:call(?MODULE, {stop_read_position, Instance}).
 
 %%%===================================================================
 %%% Public TEST API

@@ -56,6 +56,26 @@ int read_position(char *buf, int *index);
  */
 int write_command(char *buf, int *index);
 
+/** @brief Start to read the position continuosly, expects 3 arguments from ENDAT 
+ *         driver in Erlang:
+ *         @param Instance ENDAT instance
+ *         @param endat_ver Endat version
+ *         @param position_bits Encoder position bits
+ *
+ * @return  < 0 on error
+ *         == 0 on success
+ */
+int start_read_position(char *buf, int *index);
+
+/** @brief Stop to read the position continuosly, expects 1 argument from ENDAT 
+ *         driver in Erlang:
+ *         @param Instance ENDAT instance
+ *
+ * @return  < 0 on error
+ *         == 0 on success
+ */
+int stop_read_position(char *buf, int *index);
+
 /** @brief Calculate the Norm CRC using Heidenhain algorithm.
  *.        this function expects 3 arguments from Endat gen_server
  *         driver in Erlang:

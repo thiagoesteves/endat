@@ -32,7 +32,7 @@
  */
 int read_cmd(char **pbuf, int *size, int *curpos);
 
-/** @brief High Level function to send messages to the host
+/** @brief High Level function to send messages {ok | error, uint32_t} to the host
  *
  * @param string String to compose the result of the operation
  * @param value Value to be part of the tuple
@@ -42,10 +42,41 @@ int read_cmd(char **pbuf, int *size, int *curpos);
  */
 int send_answer_string_ulong(const char *string, const uint32_t value);
 
+/** @brief High Level function to send messages {ok | error, list()} to the host
+ *
+ * @param string String to compose the result of the operation
+ * @param array array to compose the list
+ * @param size size of the list
+ *
+ * @return  < 0 on error
+ *         == 0 on success
+ */
 int send_answer_string_list_ulong(const char *string, const uint32_t *array, 
                                   const uint32_t size);
 
+/** @brief High Level function to send messages {ok | error, binary} to the host
+ *
+ * @param string String to compose the result of the operation
+ * @param array array to compose the binary
+ * @param size size of the binary
+ *
+ * @return  < 0 on error
+ *         == 0 on success
+ */
 int send_answer_string_binary(const char *string, const uint8_t *array, 
                               const uint32_t size);
+
+/** @brief High Level function to send messages {ok | error, binary} to the host
+ *
+ * @param string String to compose the atom operation
+ * @param instance Origin of the event
+ * @param array array to compose the binary
+ * @param size size of the binary
+ *
+ * @return  < 0 on error
+ *         == 0 on success
+ */
+int send_answer_string_postion_event(const char *string, const uint32_t instance,
+                                     const uint8_t *array, const uint32_t size);
 
 #endif /* ENDAT_C_SRC_ERL_COMM_H */

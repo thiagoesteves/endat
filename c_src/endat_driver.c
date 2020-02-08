@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h> 
 #include "erl_comm.h"
 #include "endat_driver.h"
 #include "endat_crc.h"
@@ -26,12 +27,31 @@
 #define ENDAT_CRC_MASK      (0x1F)
 #define ENDAT_CRC_BITS      (0x05)
 
+typedef struct
+{
+  uint8_t instance;
+  uint8_t endat_version;
+  uint8_t position_bits;
+  uint8_t started;
+} endat_started_data_t;
+
+static endat_started_data_t endat_started_data[ENDAT_MAX_INSTANCES];
+
+pthread_t thread_id[ENDAT_MAX_INSTANCES];
+
+static void read_position_stub(uint8_t *answer,
+                               uint32_t endat_ver,
+                               uint32_t position_bits);
+
 /****************************************************************************
  *              functions called by Erlang Gen Server                       *
  ****************************************************************************/
 
 int open_endat_driver(char *buf, int *index)
 {
+  /* Clean internal data struct */
+  memset(endat_started_data, 0, sizeof(endat_started_data));
+
   /*TODO: Insert the opening of the driver here */
 
   return send_answer_string_ulong("ok", ENDAT_OK);
@@ -48,8 +68,7 @@ int read_position(char *buf, int *index)
 {
   unsigned long instance, command, endat_ver, position_bits;
   uint8_t answer[8] = {0};
-  int8_t buff_index;
-  
+
   if (ei_decode_ulong(buf, index, &instance)   ||
       ei_decode_ulong(buf, index, &endat_ver)  ||
       ei_decode_ulong(buf, index, &command)    ||
@@ -59,16 +78,26 @@ int read_position(char *buf, int *index)
   }
 
   /*TODO: Insert the sending of reading position command here */
-
-  /* STUB CODE: Emulate ENDAT's command                                       */
   /* The suggestion is to send the 8 bits command from LSB which means we     */
   /* have to reverse the received command                                     */
   /* Once we have the answer, store LSB bits from byte 7 to byte 0            */
+
+  /* STUB CODE: Emulate ENDAT's command                                       */
   /*
    ____________________________________
   |  0000 Start + Err + position + CRC |
   |byte 0 | ...................| byte 7|
   */
+  read_position_stub(answer, endat_ver, position_bits);
+
+  return send_answer_string_binary("ok", answer, sizeof(answer));
+}
+
+static void read_position_stub(uint8_t *answer,
+                               uint32_t endat_ver,
+                               uint32_t position_bits)
+{
+  int8_t buff_index;
   static uint64_t fake_position = 0x1ADEADBEEF;
   /*Composed Inverted Position Bits */
   uint64_t inverted_pos = reverse64Bits(fake_position);
@@ -97,8 +126,7 @@ int read_position(char *buf, int *index)
     answer[buff_index--] = (uint8_t)(inverted_pos & 0xFF);
     inverted_pos >>= 8;
   }
-
-  return send_answer_string_binary("ok", answer, sizeof(answer));
+  return;
 }
 
 int write_command(char *buf, int *index)
@@ -174,6 +202,75 @@ int write_command(char *buf, int *index)
   }
 
   return send_answer_string_binary("ok", answer, sizeof(answer));
+}
+
+/* This function is going to read the position continuously and
+ * send to the endat_driver
+ */
+void *read_position_continuously(void *vargp) 
+{
+  endat_started_data_t *ptr_endat = (endat_started_data_t *)vargp;
+  uint8_t instance = ptr_endat->instance;
+  uint8_t position_bits = ptr_endat->position_bits;
+  uint8_t endat_ver = ptr_endat->endat_version;
+
+  /*Check the running flag */
+  while (ptr_endat->started)
+  {
+    uint8_t answer[8] = {0};
+    /*TODO: Insert the sending of reading position command here */
+
+    read_position_stub(answer,endat_ver,position_bits);
+    /*This delay mark the read frequency from the encoder */
+    sleep(3);
+    /*Send Position Event to the Erlang driver code */
+    send_answer_string_postion_event("endat_event", instance, answer, sizeof(answer));
+  }
+  /* Clean data struct */
+  memset(ptr_endat, 0, sizeof(endat_started_data_t));
+  return NULL;
+} 
+
+int start_read_position(char *buf, int *index)
+{
+  unsigned long instance, endat_ver, position_bits;
+  
+  if (ei_decode_ulong(buf, index, &instance)   ||
+      ei_decode_ulong(buf, index, &endat_ver)  ||
+      ei_decode_ulong(buf, index, &position_bits))
+  {
+    return ENDAT_ERROR;
+  }
+  /* check if is already started */
+  if (endat_started_data[instance].started == 0)
+  {
+    endat_started_data[instance].started = 1;
+    endat_started_data[instance].instance = instance;
+    endat_started_data[instance].endat_version = endat_ver;
+    endat_started_data[instance].position_bits = position_bits;
+    /*Start Thread */
+    pthread_create(&thread_id[instance],
+                   NULL,
+                   read_position_continuously,
+                   (void *)&endat_started_data[instance]);
+  }
+
+  return send_answer_string_ulong("ok", 0);
+}
+
+int stop_read_position(char *buf, int *index)
+{
+  unsigned long instance;
+  
+  if (ei_decode_ulong(buf, index, &instance))
+  {
+    return ENDAT_ERROR;
+  }
+  /* Stop thread */
+  endat_started_data[instance].started = 0;
+  pthread_join(thread_id[instance], NULL); 
+
+  return send_answer_string_ulong("ok", 0);
 }
 
 /*CRC test functions that can be called by endat_driver.erl */
