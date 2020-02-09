@@ -2,13 +2,23 @@
 
 __Authors:__ Thiago Esteves ([`thiagocalori@gmail.com`](thiagocalori@gmail.com)).
 
-## Note ##
+## Introduction ##
 
-This driver is under construction but the aim is to access Endat 2.1 and Endat 2.2 protocol encoders to read and configure it using Erlang.
+This is a driver to access the position encoder that is under Endat 2.1 and/or Endat 2.2 protocol using Erlang code. The user can choose to read each position individually or configure to send the position every X milliseconds to be analysed.
+
+```bash
+                     ___________________________________________________
+                    | PORT + NIFS  |   endat_driver.erl   |  endat.erl  |
+   _________         ________              _____           _____________
+  |ENCODER0 \ ----> | C Code | <--------> | Bin | <-----> | Extract Pos | Instance 0
+  |_________/  |--> |________|            |_____| <-|     |_____________|
+               |                                    |
+   _________   |                                    |       _____________
+  |ENCODER1 \ -|                                    |---> | Extract Pos | Instance 1
+  |_________/                                             |_____________|
+```
 
 PS: There some improvements in the C code that can be used in other codes and not only in Erlang.
-
-## Introduction ##
 
 ### Compiling and Running ###
 
@@ -18,12 +28,24 @@ To compile and run for your machine just call the following command in the CLI:
 $ make
 ```
 
-### Use case: Creating Endat devices ###
+### Creating Endat devices ###
 
 ```erlang
-
+1> rr(endat).
+[endat_info]
+2> endat_sup:create_endat(0).
+{ok,<0.168.0>}
+3> endat:get_position().
+{ok,11386608}
+4> endat:get_state().
+#endat_info{instance = 0,endat_version = 1,id = 51201,
+            serial = 1649664,bits_pos1 = 25}
+5> endat:start_read_position().
+{ok,0}
+P: 11387364
+6> endat:stop_read_position().
+{ok,0}
 ```
-### Global configuration records ###
 
 ### Endat 2.1 and Endat 2.2 CRC Calculation ###
 
