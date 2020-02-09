@@ -78,7 +78,9 @@ terminate(_, Port) ->
 %% @private
 %%--------------------------------------------------------------------
 handle_info({Port, {data,Msg}}, Port) ->
-  io:format("\n\r ~p", [binary_to_term(Msg)]),
+  {endat_event, Instance, Bin} = binary_to_term(Msg),
+  %% Send message to the respective instance
+  gproc:send(started_proccess_key(Instance), {endat_event, Bin}),
   {noreply, Port};
 
 handle_info(_Info, State) ->
@@ -142,10 +144,24 @@ write_command(Instance, Command, Timeout) ->
   gen_server:call(?MODULE, {write_command, Instance, Command, Timeout}).
 
 start_read_position(Instance, EndatVersion, PositionBits) ->
-  gen_server:call(?MODULE, {start_read_position, Instance, EndatVersion, PositionBits}).
+  %% Register PID from the request endat, this means that now the endat_driver
+  %% can redirect any event received from the c code to the respective gen_server
+  case gproc:lookup_pids(started_proccess_key(Instance)) of
+    [_Pid] -> {ok, already_started};
+    _  -> %% empty list, proccess isn't started yet
+      true = gproc:reg(started_proccess_key(Instance)),
+      gen_server:call(?MODULE, {start_read_position, Instance, EndatVersion, PositionBits})
+  end.
 
 stop_read_position(Instance) ->
-  gen_server:call(?MODULE, {stop_read_position, Instance}).
+  %% Unregister Pid
+  case gproc:lookup_pids(started_proccess_key(Instance)) of
+    [_Pid]  -> %% empty list, proccess isn't started yet
+      gen_server:call(?MODULE, {stop_read_position, Instance}),
+      true = gproc:unreg(started_proccess_key(Instance)),
+      {ok, 0};
+    _ -> {ok, already_stopped}
+  end.
 
 %%%===================================================================
 %%% Public TEST API
@@ -162,4 +178,11 @@ makeCrcPos(Clocks, Endat, Error1, Error2, Highpos, Lowpos) ->
 
 makeCrcPosLt(Clocks, Endat, Error1, Error2, Highpos, Lowpos) ->
   gen_server:call(?MODULE, {makeCrcPosLt, Clocks, Endat, Error1, Error2, Highpos, Lowpos}).
+
+%%%===================================================================
+%%% Private functions
+%%%===================================================================
+
+started_proccess_key(I)->
+  {n, l, {?MODULE, I}}.
 

@@ -18,6 +18,20 @@
 #define BUFFER_SIZE       (100)
 #define TUPLE_HEADER_SIZE (2)
 
+/** @brief Initialise internal mutex
+ *
+ * @return  < 0 on error
+ *         == 0 on success
+ */
+int erl_comm_init(void);
+
+/** @brief Destroy internal mutex
+ *
+ * @return  < 0 on error
+ *         == 0 on success
+ */
+int erl_comm_finish(void);
+
 /** @brief Read the received message
  *
  * @param buf    a pointer to a pointer to the buffer to place the message in

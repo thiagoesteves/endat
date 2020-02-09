@@ -85,6 +85,11 @@ int main()
       perror("malloc()");
       exit(1);
   }
+
+  /* Initialise erl_comm module */
+  if (erl_comm_init()) {
+      exit(1);
+  }
   
   while ((retval = select(maxfd + 1, &readfds, NULL, NULL, NULL)) >= 0)
   {
@@ -119,5 +124,6 @@ int main()
     }
   }
   free(inbuf);
+  erl_comm_finish();
   exit(10);
 }

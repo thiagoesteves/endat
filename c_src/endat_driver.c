@@ -27,6 +27,11 @@
 #define ENDAT_CRC_MASK      (0x1F)
 #define ENDAT_CRC_BITS      (0x05)
 
+/* Define the sending frequency of position after the start (in us) */
+#define POSITION_FREQUENCY  (10000)
+
+static uint64_t fake_position = 0x1ADEADBEEF;
+
 typedef struct
 {
   uint8_t instance;
@@ -39,9 +44,13 @@ static endat_started_data_t endat_started_data[ENDAT_MAX_INSTANCES];
 
 pthread_t thread_id[ENDAT_MAX_INSTANCES];
 
+/* Stub Functions to emulat Endat Encoder */
 static void read_position_stub(uint8_t *answer,
                                uint32_t endat_ver,
                                uint32_t position_bits);
+static void write_command_stub(uint8_t *answer,
+                               uint32_t rcv_cmd,
+                               uint32_t command);
 
 /****************************************************************************
  *              functions called by Erlang Gen Server                       *
@@ -93,42 +102,6 @@ int read_position(char *buf, int *index)
   return send_answer_string_binary("ok", answer, sizeof(answer));
 }
 
-static void read_position_stub(uint8_t *answer,
-                               uint32_t endat_ver,
-                               uint32_t position_bits)
-{
-  int8_t buff_index;
-  static uint64_t fake_position = 0x1ADEADBEEF;
-  /*Composed Inverted Position Bits */
-  uint64_t inverted_pos = reverse64Bits(fake_position);
-  inverted_pos = (uint64_t)(inverted_pos >> (64 - position_bits));
-  /*Calculate CRC */
-  uint8_t crc = (uint8_t)(LookupTableMakeCrcPos(position_bits, endat_ver, 0, 1, 
-                 (uint32_t)(fake_position >> 32), (uint32_t)(fake_position)) );
-  /* Insert CRC */
-  inverted_pos = (uint64_t)(inverted_pos << ENDAT_CRC_BITS) | 
-                           (uint64_t)(crc & ENDAT_CRC_MASK);
-  /* Insert Start bit = 1 + Error = 0*/
-  if (endat_ver == 0)
-  { /* Endat 2.1 */
-    inverted_pos |= (uint64_t)((0x1ULL) << (position_bits+ENDAT_CRC_BITS+1));
-  }
-  else
-  { /* Endat 2.2  Start=1 , Err1 = 0, Err2 = 1 */
-    inverted_pos |= (uint64_t)((0x1ULL) << (position_bits+ENDAT_CRC_BITS));
-    inverted_pos |= (uint64_t)((0x1ULL) << (position_bits+ENDAT_CRC_BITS+2));
-  }
-
-  /* Compose answer */
-  buff_index = 7;
-  while (buff_index >= 0)
-  {
-    answer[buff_index--] = (uint8_t)(inverted_pos & 0xFF);
-    inverted_pos >>= 8;
-  }
-  return;
-}
-
 int write_command(char *buf, int *index)
 {
   unsigned long instance, command, timeout, send_endat_cmd;
@@ -157,49 +130,7 @@ int write_command(char *buf, int *index)
   |  0000 Start + Param8 + Param16 + CRC |
   |byte 0 | .....................| byte 7|
   */
-
-  /* Analyse command to emulate the correct answer                            */
-  if ((send_endat_cmd & ENDAT_MODE_MASK) == 0x2A)        /* reset command */
-  { /* Start bit + 24 bits + CRC */
-    answer[7] = 0x18;
-    answer[6] = 0x00;
-    answer[5] = 0x00;
-    answer[4] = 0x20;
-  }
-  else if ((send_endat_cmd & ENDAT_MODE_MASK) ==  0x62)  /* reading command */
-  {
-    /* Extract information from command */
-    uint8_t Address = (command & 0xFF0000) >> 16;
-    uint16_t Param16 = 0;
-    
-    if (Address == 0x08) {
-      Param16 = 1;  /* Version of Endat - Indicate Endat 2.2 */
-    } else if (Address == 0x09) {
-      Param16 = 200; /* Serial */
-    } else if (Address == 0x0D) {
-      Param16 = 25; /* Number of clocks */
-    } else if (Address == 0x0C) {
-      Param16 = 300; /* serial */
-    }
-    /* Compose answer */
-    answer[7] = (uint8_t)((Param16 & 0x7) << 5 ) | 
-                 (uint8_t)(LookupTableMakeCrcNorm(Address, Param16));
-    answer[6] = (uint8_t)((Param16 & 0x7FF) >> 3);
-    answer[5] = (Address << 5) | (uint8_t)(Param16 >> 11);
-    answer[4] = 0x20 | (Address >> 3);
-  }
-  else if ((send_endat_cmd & ENDAT_MODE_MASK) ==  0x38)  /* select memory */
-  {
-    /* Extract information from command */
-    uint8_t Address = (command & 0xFF0000) >> 16;
-    uint16_t Param16 = 0;
-    /* Compose answer */
-    answer[7] = (uint8_t)((Param16 & 0x7) << 5 ) | 
-                 (uint8_t)(LookupTableMakeCrcNorm(Address, Param16));
-    answer[6] = (uint8_t)((Param16 & 0x7FF) >> 3);
-    answer[5] = (Address << 5) | (uint8_t)(Param16 >> 11);
-    answer[4] = 0x20 | (Address >> 3);
-  }
+  write_command_stub(answer, send_endat_cmd, command);
 
   return send_answer_string_binary("ok", answer, sizeof(answer));
 }
@@ -222,7 +153,7 @@ void *read_position_continuously(void *vargp)
 
     read_position_stub(answer,endat_ver,position_bits);
     /*This delay mark the read frequency from the encoder */
-    sleep(3);
+    usleep(POSITION_FREQUENCY);
     /*Send Position Event to the Erlang driver code */
     send_answer_string_postion_event("endat_event", instance, answer, sizeof(answer));
   }
@@ -340,4 +271,89 @@ int make_crc_pos_lt(char *buf, int *index)
   crc = LookupTableMakeCrcPos(clocks, endat, error1, error2, highpos, lowpos);
 
   return send_answer_string_ulong("ok", crc);
+}
+
+static void read_position_stub(uint8_t *answer,
+                               uint32_t endat_ver,
+                               uint32_t position_bits)
+{
+  int8_t buff_index;
+  /* Update position */
+  fake_position++;
+  /*Composed Inverted Position Bits */
+  uint64_t inverted_pos = reverse64Bits(fake_position);
+  inverted_pos = (uint64_t)(inverted_pos >> (64 - position_bits));
+  /*Calculate CRC */
+  uint8_t crc = (uint8_t)(LookupTableMakeCrcPos(position_bits, endat_ver, 0, 1, 
+                 (uint32_t)(fake_position >> 32), (uint32_t)(fake_position)) );
+  /* Insert CRC */
+  inverted_pos = (uint64_t)(inverted_pos << ENDAT_CRC_BITS) | 
+                           (uint64_t)(crc & ENDAT_CRC_MASK);
+  /* Insert Start bit = 1 + Error = 0*/
+  if (endat_ver == 0)
+  { /* Endat 2.1 */
+    inverted_pos |= (uint64_t)((0x1ULL) << (position_bits+ENDAT_CRC_BITS+1));
+  }
+  else
+  { /* Endat 2.2  Start=1 , Err1 = 0, Err2 = 1 */
+    inverted_pos |= (uint64_t)((0x1ULL) << (position_bits+ENDAT_CRC_BITS));
+    inverted_pos |= (uint64_t)((0x1ULL) << (position_bits+ENDAT_CRC_BITS+2));
+  }
+
+  /* Compose answer */
+  buff_index = 7;
+  while (buff_index >= 0)
+  {
+    answer[buff_index--] = (uint8_t)(inverted_pos & 0xFF);
+    inverted_pos >>= 8;
+  }
+  return;
+}
+
+static void write_command_stub(uint8_t *answer,
+                               uint32_t rcv_cmd,
+                               uint32_t command)
+{
+  /* Analyse command to emulate the correct answer                            */
+  if ((rcv_cmd & ENDAT_MODE_MASK) == 0x2A)        /* reset command */
+  { /* Start bit + 24 bits + CRC */
+    answer[7] = 0x18;
+    answer[6] = 0x00;
+    answer[5] = 0x00;
+    answer[4] = 0x20;
+  }
+  else if ((rcv_cmd & ENDAT_MODE_MASK) ==  0x62)  /* reading command */
+  {
+    /* Extract information from command */
+    uint8_t Address = (command & 0xFF0000) >> 16;
+    uint16_t Param16 = 0;
+    
+    if (Address == 0x08) {
+      Param16 = 1;  /* Version of Endat - Indicate Endat 2.2 */
+    } else if (Address == 0x09) {
+      Param16 = 200; /* Serial */
+    } else if (Address == 0x0D) {
+      Param16 = 25; /* Number of clocks */
+    } else if (Address == 0x0C) {
+      Param16 = 300; /* serial */
+    }
+    /* Compose answer */
+    answer[7] = (uint8_t)((Param16 & 0x7) << 5 ) | 
+                 (uint8_t)(LookupTableMakeCrcNorm(Address, Param16));
+    answer[6] = (uint8_t)((Param16 & 0x7FF) >> 3);
+    answer[5] = (Address << 5) | (uint8_t)(Param16 >> 11);
+    answer[4] = 0x20 | (Address >> 3);
+  }
+  else if ((rcv_cmd & ENDAT_MODE_MASK) ==  0x38)  /* select memory */
+  {
+    /* Extract information from command */
+    uint8_t Address = (command & 0xFF0000) >> 16;
+    uint16_t Param16 = 0;
+    /* Compose answer */
+    answer[7] = (uint8_t)((Param16 & 0x7) << 5 ) | 
+                 (uint8_t)(LookupTableMakeCrcNorm(Address, Param16));
+    answer[6] = (uint8_t)((Param16 & 0x7FF) >> 3);
+    answer[5] = (Address << 5) | (uint8_t)(Param16 >> 11);
+    answer[4] = 0x20 | (Address >> 3);
+  }
 }

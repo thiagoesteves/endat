@@ -136,6 +136,15 @@ terminate(_, _LD) ->
 %%--------------------------------------------------------------------
 %% @private
 %%--------------------------------------------------------------------
+%% Handle the position if the driver started to receive constantly
+handle_info({endat_event, <<Bin:64>>}, State) ->
+  {ok, Pos} = analyse_received_position(State#endat_info.endat_version,
+                                        Bin,
+                                        State#endat_info.bits_pos1),
+  %% Here you have the Position being sent for analysis each 10ms
+  io:format("\rP: ~p", [Pos]),
+  {noreply, State};
+
 handle_info(_Info, State) ->
   {noreply, State}.
 

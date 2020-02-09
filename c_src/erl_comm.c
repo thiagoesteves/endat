@@ -15,9 +15,22 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 #include "erl_comm.h"
 
 #define TUPLE_EVENT_SIZE (3)
+
+pthread_mutex_t lock;
+
+int erl_comm_init(void)
+{
+  return pthread_mutex_init(&lock, NULL);
+}
+
+int erl_comm_finish(void)
+{
+  return pthread_mutex_destroy(&lock);
+}
 
 int read_cmd(char **pbuf, int *size, int *curpos)
 {
@@ -78,13 +91,19 @@ int write_exact(char *buf, int len) {
 
 int write_cmd(ei_x_buff *buff) {
   char li;
+  unsigned long result;
+
+  pthread_mutex_lock(&lock);
 
   li = (buff->index >> 8) & 0xff; 
   write_exact(&li, 1);
   li = buff->index & 0xff;
   write_exact(&li, 1);
+  result = write_exact(buff->buff, buff->index);
 
-  return write_exact(buff->buff, buff->index);
+  pthread_mutex_unlock(&lock);
+
+  return result;
 }
 
 /**
